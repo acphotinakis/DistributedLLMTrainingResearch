@@ -56,15 +56,57 @@
 \end{comment}
 
 \section{Introduction}
+\begin{comment}
+### 2. Introduction (~1 page)
+* Introduces the distributed systems problem and research context (e.g., why training massive LLMs exceeds single-GPU/single-node compute and memory limits).
+* Outlines the scope, guiding research questions, and the structural organization of the paper.
+\end{comment}
 
 \section{Distributed Architectures \& Algorithms}
+\begin{comment}
+### 3. Distributed Architectures & Algorithms (1–2 pages)
+* **System Models & Hardware**: Describes distributed systems models, hardware accelerators (GPUs/TPUs), memory hierarchies, and interconnect/network topologies (e.g., NVLink, PCIe, optical cross-datacenter links).
+* **Distributed Algorithms**: Explains foundational distributed mechanisms, such as Parameter Server vs. Ring All-Reduce, 1D/2D Tensor Parallelism, Pipeline Parallelism (GPipe, PipeDream), and ZeRO memory sharding.
+\end{comment}
+
 
 \section{Research Advances \& Synthesis}
+\begin{comment}
+### 4. Research Advances & Synthesis (2–3 pages)
+* **Comparative Literature Review**: Synthesizes and compares the **3 primary focus research papers** (e.g., *Mist*, *PGCS*, and *Megatron-LM* or *PipeDream*).
+* **Evaluation Framework**: Uses a structured framework to compare how each paper addresses:
+  * Parallelism strategies (Data, Tensor, Pipeline, Expert, or Hybrid).
+  * Communication scheduling and computation-communication overlap.
+  * Memory optimizations (sharding, activation recomputation, offloading).
+  * Experimental settings, hardware platforms, and performance speedups.
+### 5. Scope, Critique & Challenges (1–2 pages)
+* **Technical Critique**: Provides a justified evaluation of the limitations, weaknesses, and unstated assumptions of the focus papers (e.g., sensitivity to cross-datacenter network latency, pipeline bubbles, or hardware dependence).
+* **Trade-Off Analysis**: Weighs throughput and speedup against communication overhead, load imbalance, and failure recovery risks.
+* **Open Challenges**: Highlights unresolved issues in distributed LLM training, such as dynamic network heterogeneity or multi-tier memory bottlenecks.
+\end{comment}
+
 
 \section{Scope, Critique \& Challenges}
+\begin{comment}
+### 5. Scope, Critique & Challenges (1–2 pages)
+* **Technical Critique**: Provides a justified evaluation of the limitations, weaknesses, and unstated assumptions of the focus papers (e.g., sensitivity to cross-datacenter network latency, pipeline bubbles, or hardware dependence).
+* **Trade-Off Analysis**: Weighs throughput and speedup against communication overhead, load imbalance, and failure recovery risks.
+* **Open Challenges**: Highlights unresolved issues in distributed LLM training, such as dynamic network heterogeneity or multi-tier memory bottlenecks.
+\end{comment}
+
 
 \section{Conclusion}
+\begin{comment}
+### 6. Conclusion (~6–8 lines)
+* Summarizes the primary findings and insights of your literature analysis in your own words.
+\end{comment}
+
 
 \section{References}
+\begin{comment}
+### 7. References
+* Complete, formal bibliographic citations for the 3 primary focus papers alongside any background survey references used.
+\end{comment}
+
 
 \end{document}
