@@ -1,0 +1,91 @@
+\documentclass[10pt,letterpaper,twocolumn]{article}
+\usepackage[margin=0.72in,top=0.70in,bottom=0.72in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{newtxtext,newtxmath}
+\usepackage{microtype}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\usepackage{fancyhdr}
+\usepackage{lastpage}
+
+\setlength{\columnsep}{0.25in}
+\setlength{\parindent}{0.18in}
+\setlength{\parskip}{0pt}
+
+\titleformat{\section}{\normalfont\scshape\centering}{\thesection.}{0.45em}{}
+\titlespacing*{\section}{0pt}{0.8em}{0.42em}
+
+\renewcommand{\thesection}{\Roman{section}}
+
+\pagestyle{fancy}
+
+\fancyhf{}
+\fancyhead[R]{\itshape RIT Computer Science \enspace\textbullet\enspace Capstone Report}
+\fancyfoot[C]{Rochester Institute of Technology}
+\fancyfoot[R]{\thepage\space|\space Page}
+
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0.2pt}
+
+\setlength{\headheight}{14pt}
+
+\begin{document}
+
+\title{\LARGE\bfseries Distributed Training of Large Language Models\\[0.10em]\par}
+
+\author{
+    \begin{minipage}[t]{0.45\textwidth}
+        \centering
+        Andrew Photinakis \\
+        Rochester Institute of Technology \\
+        \texttt{acp7795@rit.edu} \\
+        Rochester, New York, USA
+    \end{minipage}
+}
+
+\maketitle
+
+\section{Introduction}
+
+Quantum programs are increasingly developed and executed using software frameworks that differ in how they represent circuits, simulate quantum systems, compile programs, and report resource usage. Because of these differences, simply saying that one framework or environment is “faster” than another does not necessarily provide a meaningful comparison. The workloads must represent the same problem, and the conditions under which each execution takes place need to be clearly documented \cite{Kistowski2015,Amico2022}.
+
+This project develops a standardized quantum-benchmarking repository for reproducible comparison of quantum software execution environments. The immediate scope is an ideal-simulator MVP that expresses the same benchmark instance through Qiskit Aer and Cirq Simulator adapters. A framework-neutral core defines the workload, generates cases, calculates independent references, validates normalized results, and retains canonical records. The adapters construct and execute the native circuits, then return measurements and qualified resource information. This separation is intended to prevent an SDK-specific implementation detail from silently changing the question being measured.
+
+The suite begins with three complementary workload families: Bernstein--Vazirani, Grover-style search, and a small transverse-field Ising model (TFIM) simulation.
+
+\begin{enumerate}
+    \item \textit{Bernstein--Vazirani Algorithm}: Serves as a deterministic bit-string validation workload to verify exact bit-order mapping, single-shot outcome accuracy, and oracle mapping fidelity across adapters.
+    \item \textit{Grover-Style Search Algorithm}: Provides a finite-shot distributional validation workload to evaluate probabilistic sampling fidelity, state amplitude distribution, and shot-count convergence across multi-qubit search spaces.
+    \item \textit{Transverse-Field Ising Model (TFIM) Simulation}: Offers a continuous dynamic workload for numerical observable measurement, facilitating Trotterization error analysis, time-evolution fidelity evaluation, and floating-point expectation value verification.
+\end{enumerate}
+
+Together, these workloads assess different behaviors without presenting any one algorithm as a universal measure of quantum-computing capability.
+
+For every execution, the repository records benchmark and schema versions, input parameters, seeds, shot counts, framework and environment versions, transformations, timing boundaries, and declared limitations. Correctness evidence is considered before performance interpretation: a result that fails its independent reference check cannot support a performance conclusion. Likewise, native gate counts and depths are reported as framework-qualified observations rather than forced into a common score when no shared decomposition rule exists. The expected contribution is a small but inspectable benchmark workflow that makes cross-framework results easier to reproduce, audit, and extend to future simulators or physical quantum devices.
+
+\section{Related Work}
+
+Benchmark methodology emphasizes that a benchmark is a defined evaluation procedure, not merely a collection of programs. Kistowski et al. identify relevance, reproducibility, fairness, verifiability, and usability as recurring workload-design criteria; they also note that no single workload can be strong on every dimension \cite{Kistowski2015}. These principles motivate this project’s use of multiple workload families, explicit execution rules, and independent validation rather than a single headline metric.
+
+Quantum-specific work reinforces the need for such discipline. Amico et al. argue that meaningful quantum benchmarks should be well defined, holistic, device independent where appropriate, and transparent about optimizations and their overheads \cite{Amico2022}. Their distinction between broad benchmarking and narrow diagnostics is particularly relevant: algorithmic circuits can reveal important behavior but should not be overgeneralized into an overall platform ranking. The present repository therefore preserves workload-specific correctness and resource context alongside each result.
+
+The two perspectives also place requirements on reporting. Reproducibility depends on disclosing the instance, randomness, and software configuration; fairness depends on applying comparable rules to each adapter; and verifiability depends on checking the reported outcome independently. Quantum-specific optimization practices add another concern: transformations can change the resources consumed by a circuit, and their effect is difficult to judge when the reported depth or gate count lacks a clear stage of measurement~\cite{Amico2022}.
+
+Existing suites provide important models but serve different layers of the ecosystem. MQT Bench supplies a broad, extensible collection of circuits at multiple abstraction levels to improve the comparability and reproducibility of quantum-software evaluations \cite{Quetschlich2023}. The Quantum Economic Development Consortium (QED-C) suite similarly demonstrates that an algorithm alone is insufficient: circuit-generation rules, instances, execution procedure, and analysis must be specified \cite{Lubinski2023}. This project complements those efforts with a compact, framework-neutral execution path that makes cross-adapter equivalence, bit-order normalization, reference validation, and provenance first-class artifacts. Its goal is not to replace established suites or claim quantum advantage, but to provide a transparent foundation for comparable benchmark experiments.
+
+\begin{thebibliography}{9}
+    \bibitem{Kistowski2015}
+    J. v. Kistowski, J. A. Arnold, K. Huppler, K.-D. Lange, J. L. Henning, and P. Cao, ``How to Build a Benchmark,'' in \textit{Proceedings of the 6th ACM/SPEC International Conference on Performance Engineering}, 2015, pp. 333--336.
+
+    \bibitem{Amico2022}
+    M. Amico et al., ``Defining Best Practices for Quantum Benchmarks,'' \textit{arXiv preprint arXiv:2204.13719}, 2022.
+
+    \bibitem{Quetschlich2023}
+    N. Quetschlich, L. Burgholzer, and R. Wille, ``MQT Bench: Benchmarking Software and Design Automation Tools for Quantum Computing,'' \textit{Quantum}, vol. 7, p. 1062, 2023.
+
+    \bibitem{Lubinski2023}
+    T. Lubinski et al., ``Application-Oriented Performance Benchmarks for Quantum Computing,'' \textit{arXiv preprint arXiv:2110.03137}, 2023.
+\end{thebibliography}
+
+\end{document}
