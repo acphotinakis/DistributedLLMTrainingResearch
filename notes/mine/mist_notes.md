@@ -1,4 +1,4 @@
-# MIST PAPER NOTES
+****# MIST PAPER NOTES
 
 ## 2. Problem and motivation
 
@@ -115,47 +115,155 @@ solve three fundamental flaws in prior systems
    3. derives closed-form algebraic equations for memory and runtime, allowing millions of configs to be evaluated instantly via simple numerical value substitution
 02. explicit overlapping of cpu-gpu swapping with gpu compute
    1. prior auto-parallelization systems ignored overlap opportunities beyond basic gradient syncing
+   2. mist scheduls parameter all-gathering, activation swapping, and optimizer state offloading to hide within active GPU tensor calculations or pipeline bubbles
 
 ### Is the contribution unique compared with previous work?
 
+Yes
+01. first distributed training system to achieve comprehensive co-optimization across all 3D parallelism dimensions and all memory footprint reduction techniques
+
 ### Which parts are new, and which parts combine existing techniques?
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                        MIST FRAMEWORK ARCHITECTURE                     │
+├───────────────────────────────────┬────────────────────────────────────┤
+│     COMBINED EXISTING PRIMITIVES  │       TECHNICALLY NEW INVENTIONS   │
+├───────────────────────────────────┼────────────────────────────────────┤
+│ • Data Parallelism (DP)           │ • Memory-Parallelism Co-          │
+│ • Tensor Parallelism (TP)         │   Optimization Formulation         │
+│ • Pipeline Parallelism (PP)       │ • Symbolic Performance Analyzer    │
+│ • Activation Checkpointing (CKPT) │   (Closed-form shape expressions)  │
+│ • ZeRO Sharding (Levels 1/2/3)    │ • Multi-Kernel Interference        │
+│ • CPU Offloading / Swapping       │   Slowdown Model                   │
+│ • PyTorch Computational Graph     │ • Imbalance-Aware Hierarchical     │
+│ • Off-the-Shelf CBC MILP Solver   │   Pareto MILP Auto-Tuner           │
+└───────────────────────────────────┴────────────────────────────────────┘
+
+```
 
 ### What assumptions make the proposed approach possible?
 
 ## 4. Distributed architecture
 
+Introduces automated distributed system architecture design to traing multi-billion parameter Transformer models
+
+To visualize how Mist coordinates host CPUs and GPUs across a cluster, consider this diagram of worker nodes and multi-stream execution:
+
+```
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│                             MIST WORKER NODE (Cluster Node)                       │
+│                                                                                  │
+│   ┌──────────────────────────────────────────────────────────────────────────┐   │
+│   │                              HOST CPU RAM                                │   │
+│   │   [Offloaded Weights (WO)]  [Offloaded Gradients (GO)]                     │   │
+│   │   [Offloaded Optimizer States (PO)]  [Offloaded Activations (AO)]          │   │
+│   └───────────────────────────────────┬──────────────────────────────────────┘   │
+│                                       │ PCIe Bus (H2D / D2H Transfers)           │
+│                                       ▼                                          │
+│   ┌──────────────────────────────────────────────────────────────────────────┐   │
+│   │                              GPU ACCELERATOR                             │   │
+│   │                                                                          │   │
+│   │  Stream 1 (Compute):   [Forward Pass (Fi)]  [Backward Pass (Bi)]           │   │
+│   │  Stream 2 (GPU-GPU):   [Parameter All-Gather]  [Gradient Reduce-Scatter]   │   │
+│   │  Stream 3 (H2D Copy):  [Fetch Parameters / Activations from CPU]         │   │
+│   │  Stream 4 (D2H Copy):  [Offload Activations / Optimizer to CPU]          │   │
+│   │                                                                          │   │
+│   │  VRAM Memory:          [Stage Layers (WX)]  [Active Activations]          │   │
+│   └───────────────────────────────────┬──────────────────────────────────────┘   │
+└───────────────────────────────────────┼──────────────────────────────────────────┘
+                                        │ NVLink / InfiniBand Interconnect
+                                        ▼
+                   [Other GPUs in 2D Device Mesh (DPX × TPX)]
+
+```
+
 ### What are the participating components?
+
+01. Splits training tasks between main server processors and specialized AI accelerators connected via internal system buses and network cables
+02. participating hardware and software cmpts
+   1. host cpus and host ram
+      01. function as offload tragets to temp store extra model states and activations when GPU vram filles up
+   2. gpu accelerators and vram 
+      01. execute high-speed matrix calcs and store active model layers
+   3. inter-device interconnects 
+      01. high speed intra-node buses (pcie, nvlink) and inter-node networks (infiniband, Roce)
+   4. symbolic performance analyzer 
+      01. a cpu-side module that models memory usage and execution latency using symbolic math expressions rather than physical trials 
+   5. imbalance-aware auto-tuner 
+      01. a planner that solves linear equations (MILP) to calculate optimal division of work across gpus
+   6. pytorch execution engine
+      01. a runtime engine that executes multi-stream cuda operations, automated pipelining, and overlapped cpu-gpu memory buffers
 
 ### How many GPUs, nodes, clusters, or data centers are involved?
 
+01. eval'd on clusters scaling up to 32 gpus spanning 4 physical server machiens
+
 ### What is placed on each device or node?
+
+01. each gpu holds slice of neural network layers, while host Cpu memory stores offloaded parameters and optimizer data that dont fit in gpu memory
+
+Resource Allocation Strategy:
+
+01. Placed on GPU VRAM:
+   1. Model Layers: Assigned subset of Transformer layers for that pipeline stage ($W_X$)1718.
+   2. Active Activations: Temporary forward-pass tensor outputs required for immediate backpropagation1920.
+   3. Local Model States: Sharded parameter weights, gradients, and optimizer states determined by the stage's ZeRO sharding level (ZeRO-1, ZeRO-2, or ZeRO-3)518.
+02. Placed on Host CPU RAM:
+   1. Offloaded Weights ($W_O$): Fraction of model weights swapped to CPU host memory1821.
+   2. Offloaded Gradients ($G_O$): Fraction of computed gradients swapped to CPU1821.
+   3. Offloaded Optimizer States ($P_O$): Fraction of FP32 Adam optimizer states stored in CPU RAM1821.
+   4. Offloaded Activations ($A_O$): Stash of forward activations swapped out over PCIe to free VRAM for compute1821.
 
 ### Is there a centralized controller, parameter server, scheduler, or coordinator?
 
+01. uses central CPU controller process before training states to plan best exec strat
+02. once exec start, gpus comm directly with one another w/o central coordinator bottleneck
+
 ### How is the model divided?
 
+01. cutos ai model in mult ways simultaneously
+   1. across layers (pipeline stages)
+   2. within tensors (tensor slicing)
+   3. across memory states (sharing params and offloading)
+
 ### How is the training data divided?
+
+01. split across time into microbatch chunks and across space among parallel gpu groups
 
 ### How are tasks assigned to workers?
 
 ### Does the architecture assume homogeneous or heterogeneous hardware?
 
+01. Mist assumes all physical GPUs in the cluster are identical (homogeneous), but it applies different (heterogeneous) tuning configurations to different pipeline stages
+
 ### Does it operate within one server, across a cluster, or across data centers?
+
+01.  Mist operates within a single multi-GPU server chassis or across a dedicated cluster inside a single data center
 
 ### What network topology does it assume?
 
-Draw a simple architecture diagram for yourself. If you cannot draw the system, you probably do not yet understand it sufficiently.
+01. Mist assumes fast internal server buses for tightly coupled GPU groups and fast node-to-node network switches for cluster communication
 
 ## 5. Parallelism strategy
 
 ### Which forms of parallelism are used?
 
-  ### Data parallelism
-  ### Tensor parallelism
-  ### Pipeline parallelism
-  ### Expert parallelism
-  ### Sequence parallelism
-  ### Hybrid parallelism
+#### Data parallelism
+
+1. replicating model across multiple gpus so each gpu processes diff slice of data samples simultaneously
+
+#### Tensor parallelism
+
+1. slicing individual matrix mult ops within single transformer layer across multiple gpus
+
+#### Pipeline parallelism
+
+1. slicing network sequentially into multiple pipeline stages along layer boundaries, passing intermediate results from one gpu stage to next 
+
+#### Expert parallelism
+#### Sequence parallelism
+#### Hybrid parallelism
 
 ### What exactly is partitioned in each strategy?
 

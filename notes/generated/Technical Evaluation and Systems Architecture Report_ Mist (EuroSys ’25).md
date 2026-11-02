@@ -15,7 +15,7 @@ This foundational identification establishes Mist as a peer-reviewed system cont
 
 #### 2\. Problem and Motivation
 
-The computational and memory footprint required to pre-train and fine-tune modern LLMs has outpaced the memory capacity growth of individual GPU accelerators. For instance, pre-training LLaMA-3.1-405B consumes over 30.84 million GPU hours on NVIDIA H100 GPUs, while continuous pre-training or supervised fine-tuning costs over 2,000 GPU hours per billion tokens. To prevent out-of-memory (OOM) failures, operators rely on multidimensional parallelism (Data, Tensor, Pipeline) alongside memory footprint reduction techniques (Activation Checkpointing, ZeRO memory sharding, CPU Offloading). However, tuning these parameters manually or via existing automatic systems yields sub-optimal throughput due to severe search space truncation and an inability to account for overlapping operations and microbatch execution variance.
+The computational and memory footprint required to pre-train and fine-tune modern LLMs has outpaced the memory capacity growth of individual GPU accelerators. For instance, pre-training LLaMA-3.1-405B consumes over 30.84 million GPU hours on NVIDIA H100 GPUs, while continuous pre-training or supervised fine-tuning costs over 2, 000 GPU hours per billion tokens. To prevent out-of-memory (OOM) failures, operators rely on multidimensional parallelism (Data, Tensor, Pipeline) alongside memory footprint reduction techniques (Activation Checkpointing, ZeRO memory sharding, CPU Offloading). However, tuning these parameters manually or via existing automatic systems yields sub-optimal throughput due to severe search space truncation and an inability to account for overlapping operations and microbatch execution variance.
 
 1. **Specific Problem Addressed:**  Existing automatic distributed training systems fail to comprehensively co-optimize memory footprint reduction techniques (activation checkpointing, ZeRO sharding, offloading) alongside 3D parallelism strategies (Data, Tensor, Pipeline parallelism).  
 2. **Importance to Distributed Training:**  Distributed training configurations govern system throughput, hardware utilization, and iteration runtime. Sub-optimal configurations result in high hardware idle time (pipeline bubbles), communication bottlenecks, or catastrophic OOM failures. Minor improvements in system efficiency translate to massive financial and environmental savings.  
@@ -40,15 +40,38 @@ Mist introduces a paradigm shift in distributed ML infrastructure by treating me
 * *Fine-Grained Overlap-Centric Schedule Template:*  A deterministic execution schedule that maximizes 4-way concurrency among computation, inter-GPU NCCL communication, and bidirectional CPU-GPU transfers.  
 * *Symbolic Performance Analysis System:*  A single-pass computational graph tracer utilizing fake tensors and meta-devices to generate closed-form symbolic expressions for runtime and peak memory usage, accelerating configuration evaluation by  \$\>10^5\\times\$ .  
 * *Imbalance-Aware Hierarchical Auto-Tuning Algorithm:*  A decoupled optimization pipeline combining intra-stage dual-objective Pareto sampling with an inter-stage Mixed Integer Linear Programming (MILP) solver that explicitly accounts for inter-microbatch execution variability.  
-* *Artifact Release:*  An open-source prototype (27,000+ lines of Python/PyTorch code) evaluated and verified with ACM Artifacts Evaluated (Functional v1.1), Artifacts Available (v1.1), and Results Reproduced (v1.1) badges.  
+* *Artifact Release:*  An open-source prototype (27, 000+ lines of Python/PyTorch code) evaluated and verified with ACM Artifacts Evaluated (Functional v1.1), Artifacts Available (v1.1), and Results Reproduced (v1.1) badges.  
 * **Technical Novelty:**  Unlike prior frameworks that rely on repeated concrete simulation passes or fixed memory strategies, Mist derives exact symbolic performance models and integrates a data-driven 4-operator kernel interference model.  
 * **Uniqueness:**  Mist is the first system to enable stage-wise, fine-grained co-optimization of Data, Tensor, and Pipeline Parallelism alongside ZeRO-1/2/3, layer-level activation checkpointing, and continuous floating-point CPU offloading ratios ( \$o\_p, o\_g, o\_o, o\_a\$ ).  
 * **Core Architectural Assumptions:**  Transformer layers within a given pipeline stage exhibit identical structural and computational properties, permitting stage-wise aggregation during optimization space exploration.
 
-**Paradigmatic Shift in Distributed Optimization:**  
-**Isolated Optimization Paradigm (Prior Systems)**  Parallelism Tuning (DP / TP / PP) ──\> Fixed / Sub-optimal Memory Strategy  
-**Co-Optimization Paradigm (Mist)**  ┌─────────────────────────────────────────────────────────────────┐ │ Memory footprint techniques (Offloading, ZeRO, Checkpointing)   │ │                   ▲                               ▲             │ │                   │ Co-Optimized Memory Trade-Off │             │ │                   ▼                               ▼             │ │ Parallelism Topology (TP Reduction, PP Stage Elimination)        │ └─────────────────────────────────────────────────────────────────┘  
-This theoretical conceptual shift flows directly into the physical layout and structural architecture of the distributed system.
+### Paradigmatic Shift in Distributed Optimization
+
+**Isolated Optimization Paradigm (Prior Systems)**
+
+```text
+Parallelism tuning (DP / TP / PP)
+                │
+                ▼
+Fixed or limited memory strategy
+```
+
+**Co-Optimization Paradigm (Mist)**
+
+```text
+┌──────────────────────────────────────────────────────────┐
+│ Memory techniques: Offloading, ZeRO, Checkpointing       │
+│                           ▲                              │
+│                           │                              │
+│                  Joint optimization                      │
+│                           │                              │
+│                           ▼                              │
+│ Parallelism configuration: DP / TP / PP                  │
+└──────────────────────────────────────────────────────────┘
+```
+
+This joint optimization determines how model computation and
+memory states are distributed across GPUs and CPU memory.
 
 #### 4\. Distributed Architecture
 
@@ -69,7 +92,7 @@ Mist operates across distributed GPU clusters, organizing compute resources into
 
 **Physical and Logical System Layout:**  
 **Central Auto-Tuner & Symbolic Analyzer**  ├── Traces Symbolic Model Graph (Fake Tensors / Meta Devices) ├── Profiles Kernels & Trains 4-Op Interference Model ├── Solves Hierarchical Optimization (Intra-Stage Pareto \+ Inter-Stage MILP) └── Generates System Schedule Plan  
-**Distributed Execution Cluster**  ├──  **Node 1..N**  (Inter-Node Interconnect: 100Gbps–400Gbps InfiniBand/Ethernet) │    ├──  **Host CPU System Memory**  (Pinned RAM Buffers for Offloaded States) │    └──  **GPU Workers 1..M**  (Intra-Node Interconnect: PCIe Gen3/4 or NVLink) │         ├──  **Pipeline Stage**  **\$c**\$  (Assigned  \$W\_c\$  Transformer Layers) │         ├──  **Tensor-Parallel Rank Set**  **\$T\_c**\$  (Intra-Layer Parameter Sharding) │         ├──  **Data-Parallel / ZeRO Group**  **\$D\_c**\$  (Optimizer State / Gradient Sharding) │         └──  **Multi-Stream Execution Engine**  (Concurrent Compute, NCCL, D2H/H2D)  
+**Distributed Execution Cluster**  ├──  **Node 1.. N**  (Inter-Node Interconnect: 100Gbps–400Gbps InfiniBand/Ethernet) │    ├──  **Host CPU System Memory**  (Pinned RAM Buffers for Offloaded States) │    └──  **GPU Workers 1.. M**  (Intra-Node Interconnect: PCIe Gen3/4 or NVLink) │         ├──  **Pipeline Stage**  **\$c**\$  (Assigned  \$W\_c\$  Transformer Layers) │         ├──  **Tensor-Parallel Rank Set**  **\$T\_c**\$  (Intra-Layer Parameter Sharding) │         ├──  **Data-Parallel / ZeRO Group**  **\$D\_c**\$  (Optimizer State / Gradient Sharding) │         └──  **Multi-Stream Execution Engine**  (Concurrent Compute, NCCL, D2H/H2D)  
 Understanding this structural topology allows for an in-depth examination of Mist's multidimensional parallelism strategy.
 
 #### 5\. Parallelism Strategy
@@ -117,11 +140,11 @@ Managing communication overhead is directly linked to GPU memory utilization, as
 #### 7\. Memory Management
 
 GPU memory allocation during LLM training consists of four primary categories: Model Parameters, Gradients, Optimizer States, and Activations. Mist balances the trade-offs between memory footprint reduction and computational latency by tuning fine-grained offloading ratios and recomputation budgets per stage.  
-Memory Component,Data Type,Baseline Treatment,Mist Optimization Knob,Performance Trade-off  
-Parameters,FP16 / BF16,Replicated or TP-sharded,"Sharded via ZeRO-3; Offloaded ( \$o\_p \\in 0,1\$ )",Frees GPU VRAM; adds H2D/D2H transfer overhead & All-Gather communication  
-Gradients,FP16 / FP32,Replicated or DP-sharded,"Sharded via ZeRO-2; Offloaded ( \$o\_g \\in 0,1\$ )",Frees GPU VRAM; adds D2H transfer overhead & Reduce-Scatter communication  
-Optimizer States,"FP32 (Master weights, momentum, variance)",Replicated across DP ranks,"Sharded via ZeRO-1; Offloaded ( \$o\_o \\in 0,1\$ )",Frees massive GPU VRAM; adds D2H/H2D CPU-GPU transfers during decoupled step  
-Activations,FP16 / BF16,Stashed in VRAM for backward pass,"Recomputed via CKPT ( \$c\_c\$  layers); Offloaded ( \$o\_a \\in 0,1\$ )",Recomputation adds \~33% backward FLOPs; Offloading adds PCIe traffic
+Memory Component, Data Type, Baseline Treatment, Mist Optimization Knob, Performance Trade-off  
+Parameters, FP16 / BF16, Replicated or TP-sharded, "Sharded via ZeRO-3; Offloaded ( \$o\_p \\in 0, 1\$ )", Frees GPU VRAM; adds H2D/D2H transfer overhead & All-Gather communication  
+Gradients, FP16 / FP32, Replicated or DP-sharded, "Sharded via ZeRO-2; Offloaded ( \$o\_g \\in 0, 1\$ )", Frees GPU VRAM; adds D2H transfer overhead & Reduce-Scatter communication  
+Optimizer States, "FP32 (Master weights, momentum, variance)", Replicated across DP ranks, "Sharded via ZeRO-1; Offloaded ( \$o\_o \\in 0, 1\$ )", Frees massive GPU VRAM; adds D2H/H2D CPU-GPU transfers during decoupled step  
+Activations, FP16 / BF16, Stashed in VRAM for backward pass, "Recomputed via CKPT ( \$c\_c\$  layers); Offloaded ( \$o\_a \\in 0, 1\$ )", Recomputation adds \~33% backward FLOPs; Offloading adds PCIe traffic
 
 * **GPU Storage Requirements:**  FP16 model parameters, FP16 gradients, FP32 master weights, FP32 Adam optimizer states (momentum/variance), saved forward activations, and temporary execution workspace memory buffers.  
 * **Replicated Objects:**  Parameters and optimizer states when DP is used without ZeRO sharding.  
@@ -156,11 +179,13 @@ Mist operates via a systematic workflow that evaluates candidate configurations 
 To account for performance degradation when multiple GPU streams execute concurrently, Mist utilizes Algorithm 1\.  
 Algorithm 1: Batched Interference Estimation  
 \--------------------------------------------------------------------------------  
-Inputs: Base GPU compute execution time vector e,   
+Inputs: Base GPU compute execution time vector e, 
+
         inter-device transfer time vector U2U (NCCL),   
         device-to-host transfer time vector d2H (GPU-\>CPU),   
         host-to-device transfer time vector H2D (CPU-\>GPU),   
         slowdown factor tensor s\_factor  
+
 Output: Predicted total overlapped latency vector A
 
 1: Function PredINTF(e, U2U, d2H, H2D, s\_factor):  
@@ -210,8 +235,8 @@ The empirical evaluation of Mist compares its throughput and tuning efficiency a
 * *DeepSpeed:*  Industrial state-of-the-art manual framework supporting ZeRO-1/2/3 and ZeRO-Offload (Grid-searched).  
 * *Aceso:*  State-of-the-art automatic distributed tuner supporting fine-grained activation checkpointing and 3D parallelism.  
 * **Evaluation Metrics:**  End-to-end training throughput (samples per second), normalized relative speedup ( \$X\\times\$ ), tuning time duration (seconds), runtime prediction error ratio (%), and memory footprint error ratio (%).  
-* **Variability Controls:**  GPU frequencies explicitly locked on test nodes (e.g., nvidia-smi \-ac 6251,1050 on L4 GPUs) to eliminate thermal throttling noise. Dropout set to 0 and biases disabled to ensure identical FLOP execution across frameworks.  
-* **Artifact Availability:**  Fully open-sourced via GitHub and Zenodo, holding official ACM Artifact Badges ( *Artifacts Evaluated \- Functional* ,  *Artifacts Available* ,  *Results Reproduced* ).
+* **Variability Controls:**  GPU frequencies explicitly locked on test nodes (e.g., nvidia-smi \-ac 6251, 1050 on L4 GPUs) to eliminate thermal throttling noise. Dropout set to 0 and biases disabled to ensure identical FLOP execution across frameworks.  
+* **Artifact Availability:**  Fully open-sourced via GitHub and Zenodo, holding official ACM Artifact Badges ( *Artifacts Evaluated \- Functional* , *Artifacts Available* , *Results Reproduced* ).
 
 These rigorous empirical methodology parameters establish the controlled experimental baseline required to evaluate Mist's quantitative throughput gains and scaling properties across physical GPU clusters.
 
@@ -247,8 +272,8 @@ Mist exhibits exceptional technical rigor, architectural innovation, and thoroug
 * **Inter-Microbatch Imbalance Awareness:**  Identifies and explicitly models microbatch execution variance ( \$h\_c, i\_c\$ ), preventing the bottleneck drifting and pipeline bubble miscalculations common in prior automatic tuners.  
 * **Data-Driven 4-Op Interference Modeling:**  Accurately quantifies performance degradation across concurrent Compute, NCCL, D2H, and H2D operations using an iterative mathematical reduction model (Algorithm 1).  
 * **Realistic and Rigorous Evaluation:**  Benchmarks real-world training environments (including FlashAttention-2 enabled setups) across three major LLM model families (GPT-3, LLaMA, Falcon) on both PCIe (L4) and NVLink (A100) hardware topologies.  
-* **High Precision Prediction Engine:**  Achieves exceptionally low prediction error rates ( \$1.79\\%\$  for iteration runtime,  \$2.10\\%\$  for peak memory usage), ensuring that selected plans perform optimally on physical hardware.  
-* **Exceptional Reproducibility:**  Holds three official ACM Artifact Badges ( *Functional* ,  *Available* ,  *Reproduced* ), providing fully containerized Docker scripts and pre-tuned benchmarking workflows.
+* **High Precision Prediction Engine:**  Achieves exceptionally low prediction error rates ( \$1.79\\%\$  for iteration runtime, \$2.10\\%\$  for peak memory usage), ensuring that selected plans perform optimally on physical hardware.  
+* **Exceptional Reproducibility:**  Holds three official ACM Artifact Badges ( *Functional* , *Available* , *Reproduced* ), providing fully containerized Docker scripts and pre-tuned benchmarking workflows.
 
 While these systemic strengths demonstrate Mist's technical contributions, a comprehensive architectural report requires evaluating the practical boundaries and critical limitations inherent to its operational design.
 
