@@ -2,7 +2,6 @@ artifacts/
 
 .DS_Store
 
-
 paper.*
-
 !paper.tex
+!paper.pdf
