@@ -70,7 +70,23 @@ The strategic imperative of modern Artificial Intelligence centers on the contin
 
 To contextualize cluster-level scaling efficiency, distributed systems engineering evaluates total model throughput using the governing cluster speedup equation established in survey literature:
 
-% $$\text{Total Training Speed} = \text{Single GPU Speed} \times \text{Number of Accelerator Chips} \times \text{Multi-GPU Speedup Ratio}$$
+
+%
+\begingroup
+\setlength{\abovedisplayskip}{4pt}
+\setlength{\belowdisplayskip}{4pt}
+\[
+    \text{Total Training Speed}
+    =
+    \text{Single-GPU Speed}
+    \times
+    \text{Accelerator Count}
+    \times
+    \text{Multi-GPU Speedup Ratio}.
+\]
+\endgroup
+%
+
 
 Maximizing total training speed requires scaling across multi-rack data center networks and multi-site Wide Area Networks (WANs). However, hardware physical infrastructure ceilings in centralized facilities impose strict boundaries on cluster expansion.
 
