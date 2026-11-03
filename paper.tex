@@ -1,12 +1,12 @@
 \documentclass[11pt,journal,draftcls, onecolumn]{IEEEtran}
 \usepackage[margin=0.72in,top=0.70in,bottom=0.72in]{geometry}
 \usepackage[T1]{fontenc}
+\usepackage[hidelinks]{hyperref}
 \usepackage{newtxtext,newtxmath}
 \usepackage{microtype}
 \usepackage{titlesec}
 \usepackage{enumitem}
 \usepackage{cite}
-\usepackage[hidelinks]{hyperref}
 \usepackage{fancyhdr}
 \usepackage{lastpage}
 \usepackage{comment}
@@ -52,12 +52,11 @@
 }
 
 \maketitle
+\vspace{-2\baselineskip}
 
 \section{Abstract}
 Scaling of Large Language Models to hundreds of billions or trillions of parameters has fundamentally invalidated single-device training paradigms. While model capacity remains directly correlated with downstream task performance, hardware advancement has proven stagnant relative to exponential growth of neural architecture memory footprints. Distributed deep learning landscape features a sharp architectural divide between automated search engines and manual heuristic frameworks. Manual 3D parallel systems require deep domain expertise to hardcode partitioning rules, frequently leading to sub-optimal resource allocation across heterogeneous interconnect topologies. Automated compilers and auto-tuners attempt to navigate these multi-dimensional search spaces algorithmicly; however, systems that isolate parallelism from memory footprint optimizations hit severe performance ceilings or physical memory limits.
-Scaling Large Language Models (LLMs) past single-accelerator High Bandwidth Memory (HBM) limits requires co-designing distributed software schedules with physical network topologies. This systematic review evaluates distributed LLM training paradigms, contrasting static 3D parallelism baselines against dynamic memory-parallelism systems like Mist and WAN-oriented frameworks like PGCS. We analyze state sharding mechanisms, tensor splitting, and pipeline scheduling, quantifying exact memory footprints and collective transmission byte volumes. Guided by the Scalability, Efficiency, and Reliability (SER) framework, we deconstruct multi-stream overlap templates, symbolic performance modeling, and hierarchical auto-tuning. Finally, we critique baseline architectural assumptions under severe network bottlenecks and formulate key open research problems for resilient foundation model infrastructure. \cite{duan2024efficienttraininglargelanguage,
-    ZENG2025100174}
-
+Scaling Large Language Models (LLMs) past single-accelerator High Bandwidth Memory (HBM) limits requires co-designing distributed software schedules with physical network topologies. This systematic review evaluates distributed LLM training paradigms, contrasting static 3D parallelism baselines against dynamic memory-parallelism systems like Mist and WAN-oriented frameworks like PGCS. We analyze state sharding mechanisms, tensor splitting, and pipeline scheduling, quantifying exact memory footprints and collective transmission byte volumes. Guided by the Scalability, Efficiency, and Reliability (SER) framework, we deconstruct multi-stream overlap templates, symbolic performance modeling, and hierarchical auto-tuning. Finally, we critique baseline architectural assumptions under severe network bottlenecks and formulate key open research problems for resilient foundation model infrastructure.
 
 
 
@@ -745,7 +744,7 @@ those transfers with computation.
 To evaluate millions of parallel combinations without executing concrete graph simulations, Mist employs a Symbolic-Based Efficient Performance Analysis System:
 
 \begin{enumerate}
-    \item Symbolic Shape Execution & Tracing: Inputs, model dimensions, and parallel degrees are declared as abstract symbolic expressions ($b, s, h, d, TP, PP, DP$). Mist executes a single symbolic simulation pass using PyTorch fake tensors and meta-devices to build a symbolic computation graph.
+    \item Symbolic Shape Execution \& Tracing: Inputs, model dimensions, and parallel degrees are declared as abstract symbolic expressions ($b, s, h, d, TP, PP, DP$). Mist executes a single symbolic simulation pass using PyTorch fake tensors and meta-devices to build a symbolic computation graph.
     \item Batched Value Substitutions: Analytical runtime and peak memory usage are derived as symbolic parametric equations. Candidate plans are evaluated via low-latency symbolic matrix substitutions rather than concrete operator executions, accelerating search space exploration by over $10^5 \times$.
     \item Data-Driven Multi-Op Interference Model: Accurately quantifies performance degradation when compute kernels, NCCL collectives, D2H transfers, and H2D transfers execute concurrently over shared buses.
 \end{enumerate}
@@ -1079,7 +1078,7 @@ No single distributed training framework eliminates all computational, memory, a
 
 \subsubsection{Critique of Mist (EuroSys ’25)}
 Mist's intra-stage perofmrnace model assumes identical Transformer layer execution blocks within a pipeline stage. While valid for standardized decoder architectures (e.g. GPT-3, LLaMa), this assumptions breaks down on non-uniform models, such as Mixture-of-Experts (MoE) architectures with sparse expert layer placements, or hybrid models combining state-space matrix (e.g. Mamba) with attention blocks. Furthermore, when aggressive host memory offloading ratios ($O_P, O_G, O_O, O_A$) are selected on PCIe-based clusters (e.g., NVIDIA L4 nodes), the concurrent execution of Stream 3 (D2H) and Stream 4 (H2D) rapidly saturates bidirectional PCIe bus bandwidth.
-PCIe Interconnect & Host Bus Contention Mode Concurrent activation swap-out (Stream 3 D2H) and parameter swap-in (Stream 4 H2D) create heavy memory traffic across host CPU DRAM channels. This contention induces NUMA node memory thrashing and CPU cache line invalidation, causing execution latency spikes that invalidate Mist's analytical interference model predictions.
+PCIe Interconnect \& Host Bus Contention Mode Concurrent activation swap-out (Stream 3 D2H) and parameter swap-in (Stream 4 H2D) create heavy memory traffic across host CPU DRAM channels. This contention induces NUMA node memory thrashing and CPU cache line invalidation, causing execution latency spikes that invalidate Mist's analytical interference model predictions.
 
 \subsubsection{Critique of PGCS (IEEE TNSE)}
 PGCS relies on a static alternating expert computation schedule optimized using Bisection Linear Programming (BLP) network flow solutions. On production cross-site WAN links, dynamic IP routing changes, transient packet loss, and bursty background traffic introduce unexpected network jitter. Because PGCS lacks runtime dynamic re-pipelining, a single transient bandwidth drop on one WAN link can stall all parameter servers, destabilizing synchronous gradient updates across nodes.
